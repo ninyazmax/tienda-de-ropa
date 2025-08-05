@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tienda de Ropa - Estilo Urbano</title>
+    <!-- Incluyendo Tailwind CSS desde CDN para estilos -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Fuente Inter para un look moderno -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap">
+    <!-- Iconos de Lucide para los botones -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Biblioteca QRious para generar códigos QR -->
+    <script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
+    <!-- Firestore y Firebase Authentication -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Variables globales para Firebase
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        // Inicializar Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        // Exportar para que estén disponibles globalmente
+        window.firebase = {
+            db,
+            auth,
+            initialAuthToken,
+            appId,
+            signInAnonymously,
+            signInWithCustomToken,
+            onAuthStateChanged,
+            collection,
+            onSnapshot,
+            addDoc,
+            deleteDoc,
+            query,
+            doc,
+            setDoc,
+            getDoc,
+            getDocs,
+            getAuth
+        };
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #121212; /* Fondo oscuro */
+            color: #E0E0E0; /* Color de texto claro */
+        }
+        /* Estilo para las tarjetas de producto */
+        .product-card {
+            background-color: #1E1E1E; /* Fondo más oscuro para las tarjetas */
+            transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+        }
+        .product-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.4);
+        }
+        /* Estilo para los botones */
+        .btn-primary {
+            background-color: #BB86FC; /* Un color violeta como acento */
+            color: #121212;
+            transition: background-color 0.3s ease-in-out, transform 0.2s ease-in-out;
+        }
+        .btn-primary:hover {
+            background-color: #9A67E8;
+            transform: translateY(-2px);
+        }
+        /* Estilo para el modal */
+        .modal-overlay {
+            background-color: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+        }
+        .modal-content {
+            background-color: #2D2D2D;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        /* Estilo para la imagen del producto en el modal */
+        .modal-img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 10px;
+        }
+        /* Estilo para el botón de cerrar del modal */
+        .modal-close-btn {
+            background-color: transparent;
+            border: none;
+            color: #E0E0E0;
+            transition: color 0.2s ease-in-out;
+        }
+        .modal-close-btn:hover {
+            color: #BB86FC;
+        }
+        /* Scrollbar styling for modal */
+        .modal-content::-webkit-scrollbar {
+            width: 8px;
+        }
+        .modal-content::-webkit-scrollbar-track {
+            background: #1e1e1e;
+        }
+        .modal-content::-webkit-scrollbar-thumb {
+            background-color: #4a4a4a;
+            border-radius: 4px;
+        }
+        /* Estilo para el toast de notificación */
+        #toast-notification {
+            visibility: hidden;
+            min-width: 250px;
+            background-color: #333;
+            color: #fff;
+            text-align: center;
+            border-radius: 2px;
+            padding: 16px;
+            position: fixed;
+            z-index: 9999;
+            bottom: 30px;
+            font-size: 17px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+        #toast-notification.show {
+            visibility: visible;
+            animation: fadein 0.5s, fadeout 0.5s 2.5s;
+        }
+        @keyframes fadein {
+            from {bottom: 0; opacity: 0;} 
+            to {bottom: 30px; opacity: 1;}
+        }
+        @keyframes fadeout {
+            from {bottom: 30px; opacity: 1;} 
+            to {bottom: 0; opacity: 0;}
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+
+    <!-- Navegación -->
+    <header class="bg-gray-900 shadow-lg sticky top-0 z-50">
+        <nav class="container mx-auto px-4 py-4 flex justify-between items-center">
+            <a href="#" class="text-2xl font-bold text-white tracking-widest">Sun&Style</a>
+            <div class="space-x-4 flex items-center">
+                <a href="#" class="hover:text-violet-400 transition-colors duration-200">Inicio</a>
+                <a href="#" class="hover:text-violet-400 transition-colors duration-200">Productos</a>
+                <a href="#" class="hover:text-violet-400 transition-colors duration-200">Contacto</a>
+                <button id="add-product-btn" class="flex items-center space-x-2 bg-violet-500 hover:bg-violet-600 text-white font-semibold py-2 px-4 rounded-full transition-colors duration-200">
+                    <i data-lucide="plus-square" class="w-5 h-5"></i>
+                    <span>Agregar Ropa</span>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- Contenido principal con las prendas -->
+    <main class="container mx-auto p-6 md:p-10">
+        <!-- Título que saluda al usuario -->
+        <h1 id="user-greeting" class="text-3xl md:text-4xl font-bold mb-6 text-center"></h1>
+        <div id="product-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 md:gap-8 hidden">
+            <!-- Las prendas se cargarán aquí desde Firestore -->
+        </div>
+        <div id="no-products-message" class="text-center text-gray-400 mt-10 hidden">
+            <p class="text-xl">¡Aún no hay productos!</p>
+            <p>Usa el botón "Agregar Ropa" para empezar a crear tu tienda.</p>
+        </div>
+    </main>
+
+    <!-- Modal para el nombre de usuario -->
+    <div id="username-modal" class="modal-overlay fixed inset-0 flex justify-center items-center p-4 hidden">
+        <div class="modal-content rounded-xl shadow-2xl p-6 w-full max-w-md transform scale-95 opacity-0 transition-all duration-300">
+            <h3 class="text-2xl font-bold mb-4 text-center">¡Bienvenido!</h3>
+            <p class="text-gray-400 mb-6 text-center">Por favor, introduce tu nombre para empezar.</p>
+            <form id="username-form">
+                <div>
+                    <label for="username-input" class="block text-sm font-medium text-gray-400">Tu nombre</label>
+                    <input type="text" id="username-input" name="username-input" required class="mt-1 block w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-md text-white shadow-sm focus:outline-none focus:ring-violet-500 focus:border-violet-500 sm:text-sm">
+                </div>
+                <button type="submit" class="w-full flex justify-center items-center space-x-2 btn-primary font-semibold py-3 px-4 rounded-full shadow-lg mt-6">
+                    <span>Empezar</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal para ver el QR del producto y compartir -->
+    <div id="qr-modal" class="modal-overlay fixed inset-0 flex justify-center items-center p-4 hidden">
+        <div class="modal-content rounded-xl shadow-2xl p-6 w-full max-w-2xl transform scale-95 opacity-0 transition-all duration-300">
+            <div class="flex justify-between items-start mb-4">
+                <h3 id="modal-title" class="text-2xl font-bold"></h3>
+                <button id="modal-close" class="modal-close-btn p-1 rounded-full hover:bg-gray-800">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+            <div class="flex flex-col md:flex-row gap-6 items-center">
+                <div class="flex-shrink-0 w-full md:w-1/2">
+                    <img id="modal-image" src="" onerror="this.src='https://placehold.co/400x500/121212/BB86FC?text=Imagen+no+disponible'" alt="" class="modal-img">
+                </div>
+                <div class="flex-grow w-full md:w-1/2">
+                    <p id="modal-description" class="text-gray-400 mb-4"></p>
+                    <div class="flex justify-between items-center mb-4">
+                        <span id="modal-price" class="text-3xl font-extrabold text-violet-400"></span>
+                        <span id="modal-sizes" class="text-sm font-semibold text-gray-500"></span>
+                    </div>
+                    <div class="bg-white p-4 rounded-lg flex justify-center mb-4">
+                        <canvas id="qr-canvas" class="w-full max-w-xs"></canvas>
+                    </div>
+                    <div class="text-center text-gray-400 text-sm mb-4">
+                        Escanea para ir al producto
+                    </div>
+                    <button id="share-link-btn" class="w-full flex items-center justify-center space-x-2 btn-primary font-semibold py-3 px-4 rounded-full shadow-lg">
+                        <i data-lucide="share-2" class="w-5 h-5"></i>
+                        <span>Compartir Enlace</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal para eliminar producto (reemplazo de `confirm()`) -->
+    <div id="delete-confirm-modal" class="modal-overlay fixed inset-0 flex justify-center items-center p-4 hidden">
+        <div class="modal-content rounded-xl shadow-2xl p-6 w-full max-w-sm transform scale-95 opacity-0 transition-all duration-300">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-2xl font-bold">¿Eliminar Prenda?</h3>
+                <button id="delete-confirm-close" class="modal-close-btn p-1 rounded-full hover:bg-gray-800">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+            <p class="text-gray-400 mb-6">Esta acción no se puede deshacer. ¿Estás seguro de que quieres eliminar esta prenda?</p>
+            <div class="flex justify-end space-x-4">
+                <button id="delete-cancel-btn" class="text-gray-400 hover:text-white font-semibold py-2 px-4 rounded-full transition-colors duration-200">
+                    Cancelar
+                </button>
+                <button id="delete-confirm-btn" class="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-full transition-colors duration-200">
+                    Eliminar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para agregar un nuevo producto -->
+    <div id="add-product-modal" class="modal-overlay fixed inset-0 flex justify-center items-center p-4 hidden">
+        <div class="modal-content rounded-xl shadow-2xl p-6 w-full max-w-xl transform scale-95 opacity-0 transition-all duration-300">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-2xl font-bold">Agregar Nueva Prenda</h3>
+                <button id="add-product-close" class="modal-close-btn p-1 rounded-full hover:bg-gray-800">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+            <form id="add-product-form" class="space-y-4">
+                <div>
+                    <label for="product-name" class="block text-sm font-medium text-gray-400">Nombre de la prenda</label>
+                    <input type="text" id="product-name" name="product-name" required class="mt-1 block w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-md text-white shadow-sm focus:outline-none focus:ring-violet-500 focus:border-violet-500 sm:text-sm">
+                </div>
+                <div>
+                    <label for="product-desc" class="block text-sm font-medium text-gray-400">Descripción</label>
+                    <textarea id="product-desc" name="product-desc" rows="3" required class="mt-1 block w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-md text-white shadow-sm focus:outline-none focus:ring-violet-500 focus:border-violet-500 sm:text-sm"></textarea>
+                </div>
+                <div>
+                    <label for="product-price" class="block text-sm font-medium text-gray-400">Precio</label>
+                    <input type="number" id="product-price" name="product-price" required class="mt-1 block w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-md text-white shadow-sm focus:outline-none focus:ring-violet-500 focus:border-violet-500 sm:text-sm">
+                </div>
+                <div>
+                    <label for="product-sizes" class="block text-sm font-medium text-gray-400">Tallas (separadas por comas, ej: S, M, L)</label>
+                    <input type="text" id="product-sizes" name="product-sizes" required class="mt-1 block w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-md text-white shadow-sm focus:outline-none focus:ring-violet-500 focus:border-violet-500 sm:text-sm">
+                </div>
+                <div>
+                    <label for="product-image" class="block text-sm font-medium text-gray-400">URL de la imagen de referencia</label>
+                    <input type="url" id="product-image" name="product-image" required class="mt-1 block w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-md text-white shadow-sm focus:outline-none focus:ring-violet-500 focus:border-violet-500 sm:text-sm">
+                </div>
+                <button type="submit" class="w-full flex justify-center items-center space-x-2 btn-primary font-semibold py-3 px-4 rounded-full shadow-lg">
+                    <i data-lucide="upload" class="w-5 h-5"></i>
+                    <span>Publicar Prenda</span>
+                </button>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Toast de notificación para copiar el enlace -->
+    <div id="toast-notification" class="rounded-full shadow-lg text-sm text-center">Enlace copiado al portapapeles</div>
+
+    <!-- JavaScript para la funcionalidad de la página -->
+    <script type="module">
+        // Acceder a las variables de Firebase exportadas
+        const {
+            db, auth, initialAuthToken, appId, signInAnonymously, signInWithCustomToken, onAuthStateChanged,
+            collection, onSnapshot, addDoc, deleteDoc, query, doc, setDoc, getDoc, getDocs, getAuth
+        } = window.firebase;
+
+        // Inicializa los iconos de Lucide
+        lucide.createIcons();
+
+        // Obtener elementos del DOM
+        const productGrid = document.getElementById('product-grid');
+        const noProductsMessage = document.getElementById('no-products-message');
+        const qrModal = document.getElementById('qr-modal');
+        const qrModalContent = qrModal.querySelector('.modal-content');
+        const qrModalCloseBtn = document.getElementById('modal-close');
+        const modalTitle = document.getElementById('modal-title');
+        const modalImage = document.getElementById('modal-image');
+        const modalDescription = document.getElementById('modal-description');
+        const modalPrice = document.getElementById('modal-price');
+        const modalSizes = document.getElementById('modal-sizes');
+        const qrCanvas = document.getElementById('qr-canvas');
+        const shareLinkBtn = document.getElementById('share-link-btn');
+        const addProductBtn = document.getElementById('add-product-btn');
+        const addProductModal = document.getElementById('add-product-modal');
+        const addProductModalCloseBtn = document.getElementById('add-product-close');
+        const addProductForm = document.getElementById('add-product-form');
+        const toast = document.getElementById('toast-notification');
+        const usernameModal = document.getElementById('username-modal');
+        const usernameForm = document.getElementById('username-form');
+        const userGreeting = document.getElementById('user-greeting');
+        const deleteConfirmModal = document.getElementById('delete-confirm-modal');
+        const deleteConfirmBtn = document.getElementById('delete-confirm-btn');
+        const deleteCancelBtn = document.getElementById('delete-cancel-btn');
+        const deleteConfirmCloseBtn = document.getElementById('delete-confirm-close');
+        
+        let userName = null;
+        let userId = null;
+        let productToDeleteId = null;
+
+        // --- Funciones de UI ---
+
+        // Función para mostrar el toast de notificación
+        function showToast(message) {
+            toast.textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+        
+        // Función para abrir el modal del QR y compartir
+        function openQrModal(product) {
+            // Llenar el modal con la información del producto
+            modalTitle.textContent = product.name;
+            modalImage.src = product.image;
+            modalImage.alt = product.name;
+            modalDescription.textContent = product.description;
+            modalPrice.textContent = `$${product.price}`;
+            modalSizes.textContent = `Tallas: ${product.sizes}`;
+
+            // Generar el código QR con la dirección del servidor y el ID del producto
+            let baseUrl = window.location.protocol + '//' + window.location.hostname;
+            const liveServerPort = window.location.port;
+            if (liveServerPort) {
+                baseUrl += ':' + liveServerPort;
+            }
+            const url = `${baseUrl}${window.location.pathname.split('?')[0]}?user=${userName}&item=${product.id}`;
+            
+            new QRious({
+                element: qrCanvas,
+                value: url,
+                size: 250,
+                background: 'white',
+                foreground: '#121212'
+            });
+
+            // Asignar el evento de compartir al botón
+            shareLinkBtn.onclick = () => {
+                copyToClipboard(url);
+            };
+
+            // Mostrar el modal con transiciones
+            qrModal.classList.remove('hidden');
+            setTimeout(() => {
+                qrModalContent.classList.remove('scale-95', 'opacity-0');
+                qrModalContent.classList.add('scale-100', 'opacity-100');
+            }, 10);
+        }
+
+        // Función para cerrar el modal del QR
+        function closeQrModal() {
+            // Cerrar el modal con transiciones
+            qrModalContent.classList.remove('scale-100', 'opacity-100');
+            qrModalContent.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                qrModal.classList.add('hidden');
+            }, 300);
+        }
+        
+        // Función para abrir el modal de agregar producto
+        function openAddProductModal() {
+            addProductModal.classList.remove('hidden');
+            setTimeout(() => {
+                addProductModal.querySelector('.modal-content').classList.remove('scale-95', 'opacity-0');
+                addProductModal.querySelector('.modal-content').classList.add('scale-100', 'opacity-100');
+            }, 10);
+        }
+
+        // Función para cerrar el modal de agregar producto
+        function closeAddProductModal() {
+            const modalContent = addProductModal.querySelector('.modal-content');
+            modalContent.classList.remove('scale-100', 'opacity-100');
+            modalContent.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                addProductModal.classList.add('hidden');
+                addProductForm.reset(); // Limpiar el formulario
+            }, 300);
+        }
+        
+        // Función para abrir el modal de nombre de usuario
+        function openUsernameModal() {
+            usernameModal.classList.remove('hidden');
+            setTimeout(() => {
+                usernameModal.querySelector('.modal-content').classList.remove('scale-95', 'opacity-0');
+                usernameModal.querySelector('.modal-content').classList.add('scale-100', 'opacity-100');
+            }, 10);
+        }
+
+        // Función para cerrar el modal de nombre de usuario
+        function closeUsernameModal() {
+            const modalContent = usernameModal.querySelector('.modal-content');
+            modalContent.classList.remove('scale-100', 'opacity-100');
+            modalContent.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                usernameModal.classList.add('hidden');
+            }, 300);
+        }
+        
+        // Función para abrir el modal de confirmación de borrado
+        function openDeleteConfirmModal(productId) {
+            productToDeleteId = productId;
+            deleteConfirmModal.classList.remove('hidden');
+            setTimeout(() => {
+                deleteConfirmModal.querySelector('.modal-content').classList.remove('scale-95', 'opacity-0');
+                deleteConfirmModal.querySelector('.modal-content').classList.add('scale-100', 'opacity-100');
+            }, 10);
+        }
+        
+        // Función para cerrar el modal de confirmación de borrado
+        function closeDeleteConfirmModal() {
+            const modalContent = deleteConfirmModal.querySelector('.modal-content');
+            modalContent.classList.remove('scale-100', 'opacity-100');
+            modalContent.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                deleteConfirmModal.classList.add('hidden');
+                productToDeleteId = null;
+            }, 300);
+        }
+
+        // Función para crear un nuevo producto
+        function createProductCard(product) {
+            const newCard = document.createElement('div');
+            newCard.id = `item-${product.id}`;
+            newCard.classList = "product-card rounded-xl overflow-hidden shadow-lg p-4 flex flex-col justify-between";
+            newCard.innerHTML = `
+                <div>
+                    <img src="${product.image}" onerror="this.src='https://placehold.co/400x500/121212/BB86FC?text=Imagen+no+disponible'" alt="${product.name}" class="w-full h-auto object-cover mb-4 rounded-lg">
+                    <h2 class="text-xl font-bold mb-2">${product.name}</h2>
+                    <p class="text-gray-400 text-sm mb-4">${product.description}</p>
+                </div>
+                <div class="mt-auto">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-2xl font-extrabold text-violet-400">$${product.price}</span>
+                        <div class="text-sm font-semibold text-gray-500">Tallas: ${product.sizes}</div>
+                    </div>
+                    <div class="flex space-x-2 mt-4">
+                        <button class="flex-1 btn-primary text-sm font-semibold py-2 px-4 rounded-full shadow-lg btn-qr" data-product-id="${product.id}">
+                            Comprar
+                        </button>
+                        <button class="btn-qr text-gray-400 hover:text-white transition-colors duration-200 p-2 rounded-full border border-gray-700 hover:border-white" data-product-id="${product.id}">
+                            <i data-lucide="scan-qr"></i>
+                        </button>
+                        <button class="delete-btn text-red-400 hover:text-red-600 transition-colors duration-200 p-2 rounded-full border border-gray-700 hover:border-red-600" data-product-id="${product.id}">
+                            <i data-lucide="trash-2"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+            // Vuelve a inicializar los íconos de lucide para el nuevo elemento
+            lucide.createIcons();
+            return newCard;
+        }
+
+        // Función para copiar texto al portapapeles
+        function copyToClipboard(text) {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            document.body.appendChild(textarea);
+            textarea.select();
+            try {
+                const successful = document.execCommand('copy');
+                if (successful) {
+                    showToast('Enlace copiado al portapapeles');
+                } else {
+                    console.error('La copia al portapapeles falló');
+                }
+            } catch (err) {
+                console.error('Error al copiar el texto: ', err);
+            }
+            document.body.removeChild(textarea);
+        }
+
+        // --- Funciones de Firestore ---
+
+        // Función para cargar los productos del usuario desde Firestore
+        function loadProducts() {
+            if (!userId) return;
+
+            const productsCollection = collection(db, `artifacts/${appId}/users/${userId}/products`);
+            
+            onSnapshot(productsCollection, (snapshot) => {
+                productGrid.innerHTML = ''; // Limpiar el grid antes de renderizar
+                if (snapshot.empty) {
+                    noProductsMessage.classList.remove('hidden');
+                } else {
+                    noProductsMessage.classList.add('hidden');
+                    snapshot.forEach(doc => {
+                        const productData = doc.data();
+                        const product = {
+                            id: doc.id,
+                            ...productData
+                        };
+                        const productCard = createProductCard(product);
+                        productGrid.appendChild(productCard);
+                    });
+                }
+                productGrid.classList.remove('hidden');
+            }, (error) => {
+                console.error("Error al escuchar los productos: ", error);
+                productGrid.innerHTML = '<p class="text-center text-red-500">Error al cargar los productos.</p>';
+                productGrid.classList.remove('hidden');
+            });
+        }
+        
+        // Función para agregar un producto a la base de datos
+        async function addProductToDb(product) {
+            if (!userId) {
+                showToast("Error: No se pudo autenticar al usuario.");
+                return;
+            }
+            try {
+                const productsCollection = collection(db, `artifacts/${appId}/users/${userId}/products`);
+                await addDoc(productsCollection, product);
+                showToast("Prenda publicada con éxito.");
+            } catch (error) {
+                console.error("Error al agregar el producto: ", error);
+                showToast("Error al publicar la prenda.");
+            }
+        }
+
+        // Función para eliminar un producto de la base de datos
+        async function deleteProductFromDb(productId) {
+            if (!userId) {
+                showToast("Error: No se pudo autenticar al usuario.");
+                return;
+            }
+            try {
+                const productRef = doc(db, `artifacts/${appId}/users/${userId}/products`, productId);
+                await deleteDoc(productRef);
+                showToast("Prenda eliminada.");
+            } catch (error) {
+                console.error("Error al eliminar el producto: ", error);
+                showToast("Error al eliminar la prenda.");
+            }
+        }
+        
+        // --- Lógica de autenticación y carga inicial ---
+        function initializeApp() {
+            onAuthStateChanged(auth, async (user) => {
+                if (user) {
+                    userId = user.uid;
+                    
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const userInUrl = urlParams.get('user');
+                    const storedUserName = localStorage.getItem('userName');
+                    
+                    if (userInUrl) {
+                         userName = userInUrl;
+                         localStorage.setItem('userName', userName);
+                         userGreeting.textContent = `Bienvenido, ${userName}!`;
+                         
+                         const productId = urlParams.get('item');
+                         if (productId) {
+                             try {
+                                 const productRef = doc(db, `artifacts/${appId}/users/${userId}/products`, productId);
+                                 const productSnap = await getDoc(productRef);
+                                 if (productSnap.exists()) {
+                                     const product = { id: productSnap.id, ...productSnap.data() };
+                                     setTimeout(() => openQrModal(product), 500);
+                                 } else {
+                                     showToast("Producto no encontrado.");
+                                 }
+                             } catch (error) {
+                                 console.error("Error al obtener el producto:", error);
+                                 showToast("Error al cargar el producto.");
+                             }
+                         }
+                         loadProducts();
+                    } else if (storedUserName) {
+                        userName = storedUserName;
+                        userGreeting.textContent = `Bienvenido, ${userName}!`;
+                        loadProducts();
+                    } else {
+                        // El usuario no tiene un nombre guardado, lo pedimos
+                        openUsernameModal();
+                    }
+                } else {
+                    try {
+                        if (initialAuthToken) {
+                            await signInWithCustomToken(auth, initialAuthToken);
+                        } else {
+                            await signInAnonymously(auth);
+                        }
+                    } catch (error) {
+                        console.error("Error de autenticación:", error);
+                        productGrid.innerHTML = '<p class="text-center text-red-500">Error al iniciar sesión. Por favor, inténtalo de nuevo.</p>';
+                    }
+                }
+            });
+        }
+        
+        // --- Event Listeners ---
+
+        productGrid.addEventListener('click', (e) => {
+            const qrBtn = e.target.closest('.btn-qr');
+            const deleteBtn = e.target.closest('.delete-btn');
+            
+            if (qrBtn) {
+                const productId = qrBtn.dataset.productId;
+                const itemElement = document.getElementById(`item-${productId}`);
+                
+                const productData = {
+                    id: productId,
+                    name: itemElement.querySelector('h2').textContent,
+                    description: itemElement.querySelector('p').textContent,
+                    price: itemElement.querySelector('.text-2xl').textContent.replace('$', ''),
+                    sizes: itemElement.querySelector('.text-sm').textContent.replace('Tallas: ', ''),
+                    image: itemElement.querySelector('img').src,
+                };
+                openQrModal(productData);
+            }
+            
+            if (deleteBtn) {
+                const productId = deleteBtn.dataset.productId;
+                openDeleteConfirmModal(productId);
+            }
+        });
+
+        qrModalCloseBtn.addEventListener('click', closeQrModal);
+        qrModal.addEventListener('click', (e) => {
+            if (e.target === qrModal) closeQrModal();
+        });
+
+        addProductBtn.addEventListener('click', openAddProductModal);
+
+        addProductModalCloseBtn.addEventListener('click', closeAddProductModal);
+        addProductModal.addEventListener('click', (e) => {
+            if (e.target === addProductModal) closeAddProductModal();
+        });
+
+        addProductForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+
+            const product = {
+                name: document.getElementById('product-name').value,
+                description: document.getElementById('product-desc').value,
+                price: parseFloat(document.getElementById('product-price').value).toFixed(2),
+                sizes: document.getElementById('product-sizes').value,
+                image: document.getElementById('product-image').value
+            };
+
+            addProductToDb(product);
+            closeAddProductModal();
+        });
+        
+        usernameForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const inputName = document.getElementById('username-input').value;
+            if (inputName && inputName.trim() !== '') {
+                userName = inputName;
+                localStorage.setItem('userName', userName);
+                userGreeting.textContent = `Bienvenido, ${userName}!`;
+                closeUsernameModal();
+                loadProducts();
+            } else {
+                showToast('Por favor, introduce un nombre válido.');
+            }
+        });
+        
+        deleteConfirmBtn.addEventListener('click', () => {
+            if (productToDeleteId) {
+                deleteProductFromDb(productToDeleteId);
+                closeDeleteConfirmModal();
+            }
+        });
+
+        deleteCancelBtn.addEventListener('click', closeDeleteConfirmModal);
+        deleteConfirmCloseBtn.addEventListener('click', closeDeleteConfirmModal);
+        deleteConfirmModal.addEventListener('click', (e) => {
+            if (e.target === deleteConfirmModal) closeDeleteConfirmModal();
+        });
+
+        initializeApp();
+    </script>
+<!-- Static App Form Collection Script -->
+<script src="https://static.app/js/static-forms.js" type="text/javascript"></script>
+
+<script src="https://static.app/js/static.js" type="text/javascript"></script>
+</body>
+</html>
