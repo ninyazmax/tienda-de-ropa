@@ -3,708 +3,1103 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tienda de Ropa - Estilo Urbano</title>
-    <!-- Incluyendo Tailwind CSS desde CDN para estilos -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Fuente Inter para un look moderno -->
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap">
-    <!-- Iconos de Lucide para los botones -->
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <!-- Biblioteca QRious para generar códigos QR -->
-    <script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
-    <!-- Firestore y Firebase Authentication -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // Variables globales para Firebase
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-
-        // Inicializar Firebase
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-        const auth = getAuth(app);
-
-        // Exportar para que estén disponibles globalmente
-        window.firebase = {
-            db,
-            auth,
-            initialAuthToken,
-            appId,
-            signInAnonymously,
-            signInWithCustomToken,
-            onAuthStateChanged,
-            collection,
-            onSnapshot,
-            addDoc,
-            deleteDoc,
-            query,
-            doc,
-            setDoc,
-            getDoc,
-            getDocs,
-            getAuth
-        };
-    </script>
+    <title>Comi D.A.C | Desayuno, Almuerzo y Cena</title>
+    <!-- Incluir bibliotecas de Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <!-- Bibliotecas para códigos QR y de barras -->
+    <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+    <!-- Fuente de Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
     <style>
+        /* Estilos base y variables */
+        :root {
+            --bg-dark: #0f0f0f;
+            --card-dark: #1a1a1a;
+            --text-light: #e0e0e0;
+            --accent: #ffb703; /* Amarillo neón para un toque vibrante */
+            --accent-hover: #ffc84d;
+            --error: #ff6d6d;
+        }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
         body {
-            font-family: 'Inter', sans-serif;
-            background-color: #121212; /* Fondo oscuro */
-            color: #E0E0E0; /* Color de texto claro */
+            font-family: 'Montserrat', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-light);
+            line-height: 1.6;
+            overflow-x: hidden;
+            position: relative;
         }
-        /* Estilo para las tarjetas de producto */
-        .product-card {
-            background-color: #1E1E1E; /* Fondo más oscuro para las tarjetas */
-            transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+        
+        /* Fondo animado */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, #2a2a0a 0%, transparent 70%),
+                        radial-gradient(circle at 100% 100%, #1e1e1e 0%, transparent 70%);
+            animation: background-move 120s linear infinite;
+            z-index: -1;
         }
-        .product-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.4);
+
+        @keyframes background-move {
+            0% { transform: translate(-50%, -50%); }
+            50% { transform: translate(0, 0); }
+            100% { transform: translate(-50%, -50%); }
         }
-        /* Estilo para los botones */
-        .btn-primary {
-            background-color: #BB86FC; /* Un color violeta como acento */
-            color: #121212;
-            transition: background-color 0.3s ease-in-out, transform 0.2s ease-in-out;
-        }
-        .btn-primary:hover {
-            background-color: #9A67E8;
-            transform: translateY(-2px);
-        }
-        /* Estilo para el modal */
-        .modal-overlay {
-            background-color: rgba(0, 0, 0, 0.8);
-            backdrop-filter: blur(5px);
-            -webkit-backdrop-filter: blur(5px);
-        }
-        .modal-content {
-            background-color: #2D2D2D;
-            max-height: 90vh;
-            overflow-y: auto;
-        }
-        /* Estilo para la imagen del producto en el modal */
-        .modal-img {
-            max-width: 100%;
-            height: auto;
-            border-radius: 10px;
-        }
-        /* Estilo para el botón de cerrar del modal */
-        .modal-close-btn {
-            background-color: transparent;
-            border: none;
-            color: #E0E0E0;
-            transition: color 0.2s ease-in-out;
-        }
-        .modal-close-btn:hover {
-            color: #BB86FC;
-        }
-        /* Scrollbar styling for modal */
-        .modal-content::-webkit-scrollbar {
+
+        /* Estilo de la barra de desplazamiento */
+        ::-webkit-scrollbar {
             width: 8px;
         }
-        .modal-content::-webkit-scrollbar-track {
-            background: #1e1e1e;
+        ::-webkit-scrollbar-track {
+            background: #1a1a1a;
         }
-        .modal-content::-webkit-scrollbar-thumb {
-            background-color: #4a4a4a;
+        ::-webkit-scrollbar-thumb {
+            background: #444;
             border-radius: 4px;
+            transition: background 0.3s ease;
         }
-        /* Estilo para el toast de notificación */
-        #toast-notification {
-            visibility: hidden;
-            min-width: 250px;
+        ::-webkit-scrollbar-thumb:hover {
+            background: #666;
+        }
+
+        header {
+            background: linear-gradient(135deg, var(--card-dark) 0%, #2a2a2a 100%);
+            background-size: 200% 200%;
+            animation: header-gradient 10s ease infinite;
+            padding: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            flex-wrap: wrap;
+        }
+
+        @keyframes header-gradient {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        h1 {
+            font-size: 1.5rem;
+            background: linear-gradient(to right, var(--accent), #ffd700);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 5px var(--accent), 0 0 10px var(--accent);
+            transition: text-shadow 0.3s ease;
+        }
+        h1:hover {
+            text-shadow: 0 0 10px var(--accent-hover), 0 0 20px var(--accent-hover);
+        }
+        .product-counter {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--accent);
+        }
+        .search-container {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-left: 1rem;
+            flex-grow: 1;
+            max-width: 400px;
+        }
+        #searchInput {
+            padding: 0.5rem;
+            border-radius: 20px;
+            border: 1px solid #555;
             background-color: #333;
-            color: #fff;
-            text-align: center;
-            border-radius: 2px;
-            padding: 16px;
+            color: var(--text-light);
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
+            flex-grow: 1;
+        }
+        #searchInput:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px rgba(255, 183, 3, 0.5);
+        }
+        .header-buttons {
+            display: flex;
+            gap: 0.8rem;
+            margin-left: auto;
+            align-items: center;
+        }
+        button {
+            background-color: var(--accent);
+            color: var(--bg-dark);
+            border: none;
+            padding: 0.6rem 1.2rem;
+            cursor: pointer;
+            border-radius: 50px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 5px rgba(255, 183, 3, 0.5), 0 4px 6px rgba(0, 0, 0, 0.2);
+            font-size: 0.9rem;
+        }
+        button:hover {
+            background-color: var(--accent-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 0 15px rgba(255, 200, 77, 0.8), 0 6px 8px rgba(0, 0, 0, 0.3);
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 1.2rem;
+            padding: 1rem;
+        }
+        .card {
+            background: var(--card-dark);
+            border-radius: 10px;
+            overflow: hidden;
+            transition: transform 0.3s, box-shadow 0.3s;
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
+            position: relative;
+        }
+        .card:hover {
+            transform: translateY(-8px) scale(1.02);
+            box-shadow: 0 0 15px rgba(255, 183, 3, 0.6), 0 12px 24px rgba(0, 0, 0, 0.4);
+        }
+        .card img {
+            width: 100%;
+            height: 180px;
+            object-fit: cover;
+            border-bottom: 1px solid #333;
+        }
+        .card-info {
+            padding: 1rem;
+        }
+        .card h3 {
+            font-size: 1.1rem;
+            margin-bottom: 0.4rem;
+        }
+        .card p {
+            color: #b0b0b0;
+            font-size: 0.85rem;
+        }
+        .card .price {
+            color: var(--accent);
+            font-weight: 600;
+            font-size: 1rem;
+            margin: 0.4rem 0;
+        }
+        .card .btnVer, .card .btnCarrito {
+            width: 100%;
+            margin-top: 0.8rem;
+            background: transparent;
+            border: 2px solid var(--accent);
+            padding: 0.4rem;
+            font-size: 0.8rem;
+            color: var(--accent);
+        }
+        .card .btnCarrito {
+            background-color: var(--accent);
+            color: var(--bg-dark);
+            border: none;
+        }
+        .card .btnCarrito:hover {
+            background-color: var(--accent-hover);
+            color: var(--bg-dark);
+        }
+        /* Modales */
+        .modal {
+            display: flex;
             position: fixed;
-            z-index: 9999;
-            bottom: 30px;
-            font-size: 17px;
-            left: 50%;
-            transform: translateX(-50%);
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+            z-index: 1000;
+            justify-content: center;
+            align-items: flex-start;
+            overflow-y: auto;
+            padding: 1rem;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
         }
-        #toast-notification.show {
+
+        .modal.show {
+            opacity: 1;
             visibility: visible;
-            animation: fadein 0.5s, fadeout 0.5s 2.5s;
         }
-        @keyframes fadein {
-            from {bottom: 0; opacity: 0;} 
-            to {bottom: 30px; opacity: 1;}
+
+        .modal-content {
+            background: linear-gradient(145deg, #1e1e1e, #2a2a2a);
+            padding: 1.5rem;
+            border-radius: 12px;
+            width: 100%;
+            max-width: 500px;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+            border: 1px solid #333;
+            margin: 2rem 0;
         }
-        @keyframes fadeout {
-            from {bottom: 30px; opacity: 1;} 
-            to {bottom: 0; opacity: 0;}
+        .modal h2 {
+            margin-bottom: 1.2rem;
+            color: var(--accent);
+            font-size: 1.3rem;
+        }
+        form input, form textarea, form select {
+            width: 100%;
+            padding: 0.7rem;
+            margin-bottom: 0.8rem;
+            border-radius: 6px;
+            border: 1px solid #333;
+            background-color: #2a2a2a;
+            color: white;
+            font-size: 0.9rem;
+        }
+        form textarea {
+            min-height: 80px;
+            resize: vertical;
+        }
+        #imagenPreview {
+            max-width: 100%;
+            max-height: 150px;
+            margin: 0.8rem 0;
+            display: none;
+            border-radius: 6px;
+        }
+        .file-input-label {
+            display: block;
+            padding: 0.7rem;
+            background: #2a2a2a;
+            border: 2px dashed #444;
+            border-radius: 6px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 0.8rem;
+            font-size: 0.9rem;
+        }
+        .file-input-label:hover, .file-input-label.dragover {
+            border-color: var(--accent);
+            background: #333;
+        }
+        #fileName {
+            font-size: 0.75rem;
+            color: #999;
+            margin-top: 0.3rem;
+        }
+        .codes-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            justify-content: center;
+            margin: 1.5rem 0;
+        }
+        .code-item {
+            text-align: center;
+        }
+        .code-item canvas {
+            background: white;
+            padding: 0.5rem;
+            border-radius: 6px;
+            max-width: 100%;
+        }
+        .error {
+            color: var(--error);
+            font-size: 0.75rem;
+            margin-top: -0.5rem;
+            margin-bottom: 0.5rem;
+            display: none;
+        }
+        .button-group {
+            display: flex;
+            gap: 0.8rem;
+            margin-top: 1rem;
+        }
+        .btn-delete {
+            background-color: var(--error);
+            transition: background-color 0.3s;
+            box-shadow: 0 0 5px rgba(255, 109, 109, 0.5), 0 4px 6px rgba(0, 0, 0, 0.2);
+            flex-grow: 1;
+        }
+        .btn-delete:hover {
+            background-color: #e65252;
+            box-shadow: 0 0 15px rgba(255, 109, 109, 0.8), 0 6px 8px rgba(0, 0, 0, 0.3);
+        }
+        .btn-edit {
+            background-color: #555;
+            transition: background-color 0.3s;
+            box-shadow: 0 0 5px rgba(85, 85, 85, 0.5), 0 4px 6px rgba(0, 0, 0, 0.2);
+            flex-grow: 1;
+        }
+        .btn-edit:hover {
+            background-color: #777;
+            box-shadow: 0 0 15px rgba(119, 119, 119, 0.8), 0 6px 8px rgba(0, 0, 0, 0.3);
+        }
+        .btn-cancel {
+            background-color: #555;
+            box-shadow: 0 0 5px rgba(85, 85, 85, 0.5), 0 4px 6px rgba(0, 0, 0, 0.2);
+        }
+        .btn-cancel:hover {
+            background-color: #777;
+            box-shadow: 0 0 15px rgba(119, 119, 119, 0.8), 0 6px 8px rgba(0, 0, 0, 0.3);
+        }
+        .cart-icon {
+            position: relative;
+            cursor: pointer;
+            padding: 0.6rem 0.8rem;
+            border-radius: 50%;
+            background-color: #333;
+            transition: background-color 0.3s ease;
+        }
+        .cart-icon:hover {
+            background-color: #555;
+        }
+        .cart-count {
+            position: absolute;
+            top: 0;
+            right: 0;
+            background-color: var(--error);
+            color: white;
+            font-size: 0.7rem;
+            padding: 2px 6px;
+            border-radius: 50%;
+            transform: translate(30%, -30%);
+            font-weight: bold;
+        }
+        
+        #cartItemsList {
+            list-style: none;
+            padding: 0;
+        }
+        .cart-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.8rem 0;
+            border-bottom: 1px solid #333;
+        }
+        .cart-item:last-child {
+            border-bottom: none;
+        }
+        .cart-item-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        .cart-item-info img {
+            width: 60px;
+            height: 60px;
+            border-radius: 6px;
+            object-fit: cover;
+        }
+        .cart-item-info h4 {
+            font-size: 1rem;
+            margin: 0;
+        }
+        .cart-item-info p {
+            font-size: 0.8rem;
+            color: #b0b0b0;
+        }
+        .cart-item-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .cart-item-actions button {
+            background-color: var(--error);
+            border-radius: 50%;
+            padding: 0.4rem;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1rem;
+        }
+        .cart-total {
+            text-align: right;
+            margin-top: 1rem;
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+        .modal-message {
+            text-align: center;
+            padding: 2rem 0;
+            font-size: 1.2rem;
+        }
+        
+        @media (max-width: 600px) {
+            .modal-content {
+                padding: 1.2rem;
+            }
+            .grid {
+                grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            }
+            .header-left {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .button-group {
+                flex-direction: column;
+            }
+            header {
+                flex-direction: column;
+                gap: 1rem;
+            }
+            .header-left {
+                width: 100%;
+                justify-content: space-between;
+            }
+            .search-container {
+                width: 100%;
+                margin-left: 0;
+            }
+            .header-buttons {
+                margin-left: 0;
+                width: 100%;
+                justify-content: space-between;
+            }
         }
     </style>
 </head>
-<body class="min-h-screen">
-
-    <!-- Navegación -->
-    <header class="bg-gray-900 shadow-lg sticky top-0 z-50">
-        <nav class="container mx-auto px-4 py-4 flex justify-between items-center">
-            <a href="#" class="text-2xl font-bold text-white tracking-widest">Sun&Style</a>
-            <div class="space-x-4 flex items-center">
-                <a href="#" class="hover:text-violet-400 transition-colors duration-200">Inicio</a>
-                <a href="#" class="hover:text-violet-400 transition-colors duration-200">Productos</a>
-                <a href="#" class="hover:text-violet-400 transition-colors duration-200">Contacto</a>
-                <button id="add-product-btn" class="flex items-center space-x-2 bg-violet-500 hover:bg-violet-600 text-white font-semibold py-2 px-4 rounded-full transition-colors duration-200">
-                    <i data-lucide="plus-square" class="w-5 h-5"></i>
-                    <span>Agregar Ropa</span>
-                </button>
+<body>
+    <header>
+        <div class="header-left">
+            <h1>🍽️ Comi D.A.C</h1>
+            <span class="product-counter" id="productCount"></span>
+        </div>
+        <div class="header-buttons">
+            <div class="search-container">
+                <input type="text" id="searchInput" placeholder="Buscar platos...">
             </div>
-        </nav>
+            <button id="btnAdd">➕ Agregar</button>
+            <div class="cart-icon" id="btnCart">
+                🛒
+                <span class="cart-count" id="cartCount">0</span>
+            </div>
+        </div>
     </header>
 
-    <!-- Contenido principal con las prendas -->
-    <main class="container mx-auto p-6 md:p-10">
-        <!-- Título que saluda al usuario -->
-        <h1 id="user-greeting" class="text-3xl md:text-4xl font-bold mb-6 text-center"></h1>
-        <div id="product-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 md:gap-8 hidden">
-            <!-- Las prendas se cargarán aquí desde Firestore -->
-        </div>
-        <div id="no-products-message" class="text-center text-gray-400 mt-10 hidden">
-            <p class="text-xl">¡Aún no hay productos!</p>
-            <p>Usa el botón "Agregar Ropa" para empezar a crear tu tienda.</p>
-        </div>
-    </main>
+    <div class="grid" id="productGrid"></div>
 
-    <!-- Modal para el nombre de usuario -->
-    <div id="username-modal" class="modal-overlay fixed inset-0 flex justify-center items-center p-4 hidden">
-        <div class="modal-content rounded-xl shadow-2xl p-6 w-full max-w-md transform scale-95 opacity-0 transition-all duration-300">
-            <h3 class="text-2xl font-bold mb-4 text-center">¡Bienvenido!</h3>
-            <p class="text-gray-400 mb-6 text-center">Por favor, introduce tu nombre para empezar.</p>
-            <form id="username-form">
-                <div>
-                    <label for="username-input" class="block text-sm font-medium text-gray-400">Tu nombre</label>
-                    <input type="text" id="username-input" name="username-input" required class="mt-1 block w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-md text-white shadow-sm focus:outline-none focus:ring-violet-500 focus:border-violet-500 sm:text-sm">
-                </div>
-                <button type="submit" class="w-full flex justify-center items-center space-x-2 btn-primary font-semibold py-3 px-4 rounded-full shadow-lg mt-6">
-                    <span>Empezar</span>
-                </button>
+    <!-- Modal para agregar/editar plato -->
+    <div class="modal" id="addModal">
+        <div class="modal-content">
+            <h2 id="addModalTitle">Nuevo Plato</h2>
+            <form id="formAdd">
+                <input type="text" id="nombre" placeholder="Nombre del plato" required>
+                <textarea id="descripcion" placeholder="Descripción" rows="3" required></textarea>
+                <input type="number" id="precio" placeholder="Precio (USD)" step="0.01" required>
+                
+                <label class="file-input-label" id="fileDropZone" for="imagen">
+                    📁 Arrastra tu imagen aquí o haz clic para subir (PNG/JPG)
+                    <input type="file" id="imagen" accept=".png,.jpg,.jpeg" style="display: none;">
+                    <div id="fileName"></div>
+                </label>
+                <img id="imagenPreview" alt="Vista previa">
+                <div id="errorFile" class="error"></div>
+                
+                <button type="submit" id="submitButton">Publicar</button>
             </form>
         </div>
     </div>
 
-    <!-- Modal para ver el QR del producto y compartir -->
-    <div id="qr-modal" class="modal-overlay fixed inset-0 flex justify-center items-center p-4 hidden">
-        <div class="modal-content rounded-xl shadow-2xl p-6 w-full max-w-2xl transform scale-95 opacity-0 transition-all duration-300">
-            <div class="flex justify-between items-start mb-4">
-                <h3 id="modal-title" class="text-2xl font-bold"></h3>
-                <button id="modal-close" class="modal-close-btn p-1 rounded-full hover:bg-gray-800">
-                    <i data-lucide="x" class="w-6 h-6"></i>
-                </button>
-            </div>
-            <div class="flex flex-col md:flex-row gap-6 items-center">
-                <div class="flex-shrink-0 w-full md:w-1/2">
-                    <img id="modal-image" src="" onerror="this.src='https://placehold.co/400x500/121212/BB86FC?text=Imagen+no+disponible'" alt="" class="modal-img">
-                </div>
-                <div class="flex-grow w-full md:w-1/2">
-                    <p id="modal-description" class="text-gray-400 mb-4"></p>
-                    <div class="flex justify-between items-center mb-4">
-                        <span id="modal-price" class="text-3xl font-extrabold text-violet-400"></span>
-                        <span id="modal-sizes" class="text-sm font-semibold text-gray-500"></span>
-                    </div>
-                    <div class="bg-white p-4 rounded-lg flex justify-center mb-4">
-                        <canvas id="qr-canvas" class="w-full max-w-xs"></canvas>
-                    </div>
-                    <div class="text-center text-gray-400 text-sm mb-4">
-                        Escanea para ir al producto
-                    </div>
-                    <button id="share-link-btn" class="w-full flex items-center justify-center space-x-2 btn-primary font-semibold py-3 px-4 rounded-full shadow-lg">
-                        <i data-lucide="share-2" class="w-5 h-5"></i>
-                        <span>Compartir Enlace</span>
-                    </button>
+    <!-- Modal para detalles del plato -->
+    <div class="modal" id="detailModal">
+        <div class="modal-content">
+            <h2 id="detailNombre"></h2>
+            <img id="detailImagen" src="" alt="" style="width: 100%; border-radius: 6px; margin: 0.8rem 0;">
+            <p id="detailDescripcion" style="margin-bottom: 1rem;"></p>
+            <div style="display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap;">
+                <div>
+                    <strong>Precio:</strong> $<span id="detailPrecio"></span> USD
                 </div>
             </div>
-        </div>
-    </div>
-    
-    <!-- Modal para eliminar producto (reemplazo de `confirm()`) -->
-    <div id="delete-confirm-modal" class="modal-overlay fixed inset-0 flex justify-center items-center p-4 hidden">
-        <div class="modal-content rounded-xl shadow-2xl p-6 w-full max-w-sm transform scale-95 opacity-0 transition-all duration-300">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="text-2xl font-bold">¿Eliminar Prenda?</h3>
-                <button id="delete-confirm-close" class="modal-close-btn p-1 rounded-full hover:bg-gray-800">
-                    <i data-lucide="x" class="w-6 h-6"></i>
-                </button>
-            </div>
-            <p class="text-gray-400 mb-6">Esta acción no se puede deshacer. ¿Estás seguro de que quieres eliminar esta prenda?</p>
-            <div class="flex justify-end space-x-4">
-                <button id="delete-cancel-btn" class="text-gray-400 hover:text-white font-semibold py-2 px-4 rounded-full transition-colors duration-200">
-                    Cancelar
-                </button>
-                <button id="delete-confirm-btn" class="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-full transition-colors duration-200">
-                    Eliminar
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal para agregar un nuevo producto -->
-    <div id="add-product-modal" class="modal-overlay fixed inset-0 flex justify-center items-center p-4 hidden">
-        <div class="modal-content rounded-xl shadow-2xl p-6 w-full max-w-xl transform scale-95 opacity-0 transition-all duration-300">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="text-2xl font-bold">Agregar Nueva Prenda</h3>
-                <button id="add-product-close" class="modal-close-btn p-1 rounded-full hover:bg-gray-800">
-                    <i data-lucide="x" class="w-6 h-6"></i>
-                </button>
-            </div>
-            <form id="add-product-form" class="space-y-4">
-                <div>
-                    <label for="product-name" class="block text-sm font-medium text-gray-400">Nombre de la prenda</label>
-                    <input type="text" id="product-name" name="product-name" required class="mt-1 block w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-md text-white shadow-sm focus:outline-none focus:ring-violet-500 focus:border-violet-500 sm:text-sm">
-                </div>
-                <div>
-                    <label for="product-desc" class="block text-sm font-medium text-gray-400">Descripción</label>
-                    <textarea id="product-desc" name="product-desc" rows="3" required class="mt-1 block w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-md text-white shadow-sm focus:outline-none focus:ring-violet-500 focus:border-violet-500 sm:text-sm"></textarea>
-                </div>
-                <div>
-                    <label for="product-price" class="block text-sm font-medium text-gray-400">Precio</label>
-                    <input type="number" id="product-price" name="product-price" required class="mt-1 block w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-md text-white shadow-sm focus:outline-none focus:ring-violet-500 focus:border-violet-500 sm:text-sm">
-                </div>
-                <div>
-                    <label for="product-sizes" class="block text-sm font-medium text-gray-400">Tallas (separadas por comas, ej: S, M, L)</label>
-                    <input type="text" id="product-sizes" name="product-sizes" required class="mt-1 block w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-md text-white shadow-sm focus:outline-none focus:ring-violet-500 focus:border-violet-500 sm:text-sm">
-                </div>
-                <div>
-                    <label for="product-image" class="block text-sm font-medium text-gray-400">URL de la imagen de referencia</label>
-                    <input type="url" id="product-image" name="product-image" required class="mt-1 block w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-md text-white shadow-sm focus:outline-none focus:ring-violet-500 focus:border-violet-500 sm:text-sm">
-                </div>
-                <button type="submit" class="w-full flex justify-center items-center space-x-2 btn-primary font-semibold py-3 px-4 rounded-full shadow-lg">
-                    <i data-lucide="upload" class="w-5 h-5"></i>
-                    <span>Publicar Prenda</span>
-                </button>
-            </form>
-        </div>
-    </div>
-    
-    <!-- Toast de notificación para copiar el enlace -->
-    <div id="toast-notification" class="rounded-full shadow-lg text-sm text-center">Enlace copiado al portapapeles</div>
-
-    <!-- JavaScript para la funcionalidad de la página -->
-    <script type="module">
-        // Acceder a las variables de Firebase exportadas
-        const {
-            db, auth, initialAuthToken, appId, signInAnonymously, signInWithCustomToken, onAuthStateChanged,
-            collection, onSnapshot, addDoc, deleteDoc, query, doc, setDoc, getDoc, getDocs, getAuth
-        } = window.firebase;
-
-        // Inicializa los iconos de Lucide
-        lucide.createIcons();
-
-        // Obtener elementos del DOM
-        const productGrid = document.getElementById('product-grid');
-        const noProductsMessage = document.getElementById('no-products-message');
-        const qrModal = document.getElementById('qr-modal');
-        const qrModalContent = qrModal.querySelector('.modal-content');
-        const qrModalCloseBtn = document.getElementById('modal-close');
-        const modalTitle = document.getElementById('modal-title');
-        const modalImage = document.getElementById('modal-image');
-        const modalDescription = document.getElementById('modal-description');
-        const modalPrice = document.getElementById('modal-price');
-        const modalSizes = document.getElementById('modal-sizes');
-        const qrCanvas = document.getElementById('qr-canvas');
-        const shareLinkBtn = document.getElementById('share-link-btn');
-        const addProductBtn = document.getElementById('add-product-btn');
-        const addProductModal = document.getElementById('add-product-modal');
-        const addProductModalCloseBtn = document.getElementById('add-product-close');
-        const addProductForm = document.getElementById('add-product-form');
-        const toast = document.getElementById('toast-notification');
-        const usernameModal = document.getElementById('username-modal');
-        const usernameForm = document.getElementById('username-form');
-        const userGreeting = document.getElementById('user-greeting');
-        const deleteConfirmModal = document.getElementById('delete-confirm-modal');
-        const deleteConfirmBtn = document.getElementById('delete-confirm-btn');
-        const deleteCancelBtn = document.getElementById('delete-cancel-btn');
-        const deleteConfirmCloseBtn = document.getElementById('delete-confirm-close');
-        
-        let userName = null;
-        let userId = null;
-        let productToDeleteId = null;
-
-        // --- Funciones de UI ---
-
-        // Función para mostrar el toast de notificación
-        function showToast(message) {
-            toast.textContent = message;
-            toast.classList.add('show');
-            setTimeout(() => {
-                toast.classList.remove('show');
-            }, 3000);
-        }
-        
-        // Función para abrir el modal del QR y compartir
-        function openQrModal(product) {
-            // Llenar el modal con la información del producto
-            modalTitle.textContent = product.name;
-            modalImage.src = product.image;
-            modalImage.alt = product.name;
-            modalDescription.textContent = product.description;
-            modalPrice.textContent = `$${product.price}`;
-            modalSizes.textContent = `Tallas: ${product.sizes}`;
-
-            // Generar el código QR con la dirección del servidor y el ID del producto
-            let baseUrl = window.location.protocol + '//' + window.location.hostname;
-            const liveServerPort = window.location.port;
-            if (liveServerPort) {
-                baseUrl += ':' + liveServerPort;
-            }
-            const url = `${baseUrl}${window.location.pathname.split('?')[0]}?user=${userName}&item=${product.id}`;
             
-            new QRious({
-                element: qrCanvas,
-                value: url,
-                size: 250,
-                background: 'white',
-                foreground: '#121212'
-            });
-
-            // Asignar el evento de compartir al botón
-            shareLinkBtn.onclick = () => {
-                copyToClipboard(url);
-            };
-
-            // Mostrar el modal con transiciones
-            qrModal.classList.remove('hidden');
-            setTimeout(() => {
-                qrModalContent.classList.remove('scale-95', 'opacity-0');
-                qrModalContent.classList.add('scale-100', 'opacity-100');
-            }, 10);
-        }
-
-        // Función para cerrar el modal del QR
-        function closeQrModal() {
-            // Cerrar el modal con transiciones
-            qrModalContent.classList.remove('scale-100', 'opacity-100');
-            qrModalContent.classList.add('scale-95', 'opacity-0');
-            setTimeout(() => {
-                qrModal.classList.add('hidden');
-            }, 300);
-        }
-        
-        // Función para abrir el modal de agregar producto
-        function openAddProductModal() {
-            addProductModal.classList.remove('hidden');
-            setTimeout(() => {
-                addProductModal.querySelector('.modal-content').classList.remove('scale-95', 'opacity-0');
-                addProductModal.querySelector('.modal-content').classList.add('scale-100', 'opacity-100');
-            }, 10);
-        }
-
-        // Función para cerrar el modal de agregar producto
-        function closeAddProductModal() {
-            const modalContent = addProductModal.querySelector('.modal-content');
-            modalContent.classList.remove('scale-100', 'opacity-100');
-            modalContent.classList.add('scale-95', 'opacity-0');
-            setTimeout(() => {
-                addProductModal.classList.add('hidden');
-                addProductForm.reset(); // Limpiar el formulario
-            }, 300);
-        }
-        
-        // Función para abrir el modal de nombre de usuario
-        function openUsernameModal() {
-            usernameModal.classList.remove('hidden');
-            setTimeout(() => {
-                usernameModal.querySelector('.modal-content').classList.remove('scale-95', 'opacity-0');
-                usernameModal.querySelector('.modal-content').classList.add('scale-100', 'opacity-100');
-            }, 10);
-        }
-
-        // Función para cerrar el modal de nombre de usuario
-        function closeUsernameModal() {
-            const modalContent = usernameModal.querySelector('.modal-content');
-            modalContent.classList.remove('scale-100', 'opacity-100');
-            modalContent.classList.add('scale-95', 'opacity-0');
-            setTimeout(() => {
-                usernameModal.classList.add('hidden');
-            }, 300);
-        }
-        
-        // Función para abrir el modal de confirmación de borrado
-        function openDeleteConfirmModal(productId) {
-            productToDeleteId = productId;
-            deleteConfirmModal.classList.remove('hidden');
-            setTimeout(() => {
-                deleteConfirmModal.querySelector('.modal-content').classList.remove('scale-95', 'opacity-0');
-                deleteConfirmModal.querySelector('.modal-content').classList.add('scale-100', 'opacity-100');
-            }, 10);
-        }
-        
-        // Función para cerrar el modal de confirmación de borrado
-        function closeDeleteConfirmModal() {
-            const modalContent = deleteConfirmModal.querySelector('.modal-content');
-            modalContent.classList.remove('scale-100', 'opacity-100');
-            modalContent.classList.add('scale-95', 'opacity-0');
-            setTimeout(() => {
-                deleteConfirmModal.classList.add('hidden');
-                productToDeleteId = null;
-            }, 300);
-        }
-
-        // Función para crear un nuevo producto
-        function createProductCard(product) {
-            const newCard = document.createElement('div');
-            newCard.id = `item-${product.id}`;
-            newCard.classList = "product-card rounded-xl overflow-hidden shadow-lg p-4 flex flex-col justify-between";
-            newCard.innerHTML = `
-                <div>
-                    <img src="${product.image}" onerror="this.src='https://placehold.co/400x500/121212/BB86FC?text=Imagen+no+disponible'" alt="${product.name}" class="w-full h-auto object-cover mb-4 rounded-lg">
-                    <h2 class="text-xl font-bold mb-2">${product.name}</h2>
-                    <p class="text-gray-400 text-sm mb-4">${product.description}</p>
+            <div class="codes-container">
+                <div class="code-item">
+                    <p>Código QR</p>
+                    <div id="qrCode"></div>
                 </div>
-                <div class="mt-auto">
-                    <div class="flex justify-between items-center mb-2">
-                        <span class="text-2xl font-extrabold text-violet-400">$${product.price}</span>
-                        <div class="text-sm font-semibold text-gray-500">Tallas: ${product.sizes}</div>
-                    </div>
-                    <div class="flex space-x-2 mt-4">
-                        <button class="flex-1 btn-primary text-sm font-semibold py-2 px-4 rounded-full shadow-lg btn-qr" data-product-id="${product.id}">
-                            Comprar
-                        </button>
-                        <button class="btn-qr text-gray-400 hover:text-white transition-colors duration-200 p-2 rounded-full border border-gray-700 hover:border-white" data-product-id="${product.id}">
-                            <i data-lucide="scan-qr"></i>
-                        </button>
-                        <button class="delete-btn text-red-400 hover:text-red-600 transition-colors duration-200 p-2 rounded-full border border-gray-700 hover:border-red-600" data-product-id="${product.id}">
-                            <i data-lucide="trash-2"></i>
-                        </button>
-                    </div>
+                <div class="code-item">
+                    <p>Código de Barras</p>
+                    <canvas id="barcode"></canvas>
+                </div>
+            </div>
+            
+            <div class="button-group">
+                <button id="btnAddCart">🛒 Agregar a la Orden</button>
+                <button id="btnEdit" class="btn-edit">✏️ Editar</button>
+                <button id="btnDelete" class="btn-delete">🗑️ Eliminar</button>
+                <button id="closeDetail">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para el carrito de compras -->
+    <div class="modal" id="cartModal">
+        <div class="modal-content">
+            <h2>🛒 Carrito de Compras</h2>
+            <ul id="cartItemsList"></ul>
+            <div class="cart-total">Total: $<span id="cartTotal">0.00</span> USD</div>
+            <div class="button-group">
+                <button id="btnBuy">💲 Comprar</button>
+                <button id="closeCart" class="btn-cancel">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de confirmación de compra -->
+    <div class="modal" id="purchaseConfirmModal">
+        <div class="modal-content">
+            <div class="modal-message">
+                <h3>¡Compra Realizada con Éxito! 🎉</h3>
+                <p>Tu orden ha sido procesada.</p>
+            </div>
+            <div class="button-group">
+                <button id="closePurchaseConfirm" class="btn-cancel" style="width: 100%;">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de confirmación para eliminar -->
+    <div class="modal" id="deleteConfirmModal">
+        <div class="modal-content">
+            <h2>¿Estás seguro?</h2>
+            <p>Esta acción no se puede deshacer.</p>
+            <div class="button-group">
+                <button id="btnConfirmDelete" class="btn-delete">Sí, Eliminar</button>
+                <button id="btnCancelDelete" class="btn-cancel">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuración de Firebase - Reemplaza con tus propios datos
+        const firebaseConfig = {
+          apiKey: "TU_API_KEY", // Reemplaza con tu API Key
+          authDomain: "tienda-ropa-tarea-e3e82.firebaseapp.com",
+          projectId: "tienda-ropa-tarea-e3e82",
+          storageBucket: "",
+          appId: "1:721478101439:web:TU_APP_ID" // Reemplaza con tu App ID
+        };
+        
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        
+        const db = firebase.firestore();
+
+        let selectedFile = null;
+        let currentProductIdToEdit = null;
+        let currentProductIdToDelete = null;
+        let allProducts = []; // Almacenar todos los productos para la búsqueda
+        let cartItems = []; // Almacenar los productos en el carrito
+        let currentItemToAdd = null; // Almacenar el item seleccionado para añadir al carrito
+        
+        // Obtener elementos del DOM
+        const btnAdd = document.getElementById('btnAdd');
+        const btnCart = document.getElementById('btnCart');
+        const addModal = document.getElementById('addModal');
+        const formAdd = document.getElementById('formAdd');
+        const productGrid = document.getElementById('productGrid');
+        const detailModal = document.getElementById('detailModal');
+        const cartModal = document.getElementById('cartModal');
+        const purchaseConfirmModal = document.getElementById('purchaseConfirmModal');
+        const closePurchaseConfirmBtn = document.getElementById('closePurchaseConfirm');
+        const cartItemsList = document.getElementById('cartItemsList');
+        const cartTotalSpan = document.getElementById('cartTotal');
+        const btnBuy = document.getElementById('btnBuy');
+        const imagenInput = document.getElementById('imagen');
+        const imagenPreview = document.getElementById('imagenPreview');
+        const fileName = document.getElementById('fileName');
+        const errorFile = document.getElementById('errorFile');
+        const productCount = document.getElementById('productCount');
+        const closeDetailBtn = document.getElementById('closeDetail');
+        const closeCartBtn = document.getElementById('closeCart');
+        const btnEdit = document.getElementById('btnEdit');
+        const btnDelete = document.getElementById('btnDelete');
+        const btnAddCart = document.getElementById('btnAddCart');
+        const deleteConfirmModal = document.getElementById('deleteConfirmModal');
+        const btnConfirmDelete = document.getElementById('btnConfirmDelete');
+        const btnCancelDelete = document.getElementById('btnCancelDelete');
+        const searchInput = document.getElementById('searchInput');
+        const addModalTitle = document.getElementById('addModalTitle');
+        const submitButton = document.getElementById('submitButton');
+        const fileDropZone = document.getElementById('fileDropZone');
+
+        // Función para procesar y previsualizar la imagen seleccionada o arrastrada
+        function handleFile(file) {
+            selectedFile = file;
+            errorFile.style.display = 'none';
+            
+            if (selectedFile) {
+                const validTypes = ['image/png', 'image/jpeg'];
+                const maxSize = 20 * 1024 * 1024; // 20MB
+                
+                if (!validTypes.includes(selectedFile.type) || selectedFile.size > maxSize) {
+                    errorFile.textContent = '¡El archivo debe ser PNG/JPG y menor a 20MB!';
+                    errorFile.style.display = 'block';
+                    imagenPreview.style.display = 'none';
+                    fileName.textContent = '';
+                    selectedFile = null;
+                    return;
+                }
+                
+                fileName.textContent = selectedFile.name.length > 20 
+                    ? selectedFile.name.substring(0, 20) + '...' 
+                    : selectedFile.name;
+                    
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    imagenPreview.src = event.target.result;
+                    imagenPreview.style.display = 'block';
+                };
+                reader.readAsDataURL(selectedFile);
+            }
+        }
+
+        // Manejar la selección de imagen y previsualización (método click)
+        imagenInput.addEventListener('change', (e) => {
+            handleFile(e.target.files[0]);
+        });
+
+        // Manejar eventos de arrastrar y soltar
+        fileDropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            fileDropZone.classList.add('dragover');
+        });
+
+        fileDropZone.addEventListener('dragleave', (e) => {
+            fileDropZone.classList.remove('dragover');
+        });
+
+        fileDropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            fileDropZone.classList.remove('dragover');
+            if (e.dataTransfer.files.length > 0) {
+                handleFile(e.dataTransfer.files[0]);
+            }
+        });
+
+        // Función para agregar productos iniciales si la colección está vacía
+        async function agregarProductosIniciales() {
+            const collectionRef = db.collection('productos');
+            const snapshot = await collectionRef.get();
+            if (snapshot.empty) {
+                const productosIniciales = [
+                    {
+                        nombre: "Tostadas Francesas",
+                        descripcion: "Tostadas gruesas empapadas en una mezcla de canela y vainilla, servidas con miel de arce y frutas frescas.",
+                        precio: 8.50,
+                        imagen: "https://placehold.co/400x300/4a4e69/c77dff?text=Desayuno",
+                        fecha: new Date(),
+                        codigo: "PL-" + Math.random().toString(36).substr(2, 8).toUpperCase()
+                    },
+                    {
+                        nombre: "Hamburguesa Clásica",
+                        descripcion: "Carne 100% de res, lechuga, tomate, cebolla, queso cheddar y nuestra salsa especial en un pan brioche.",
+                        precio: 12.00,
+                        imagen: "https://placehold.co/400x300/1a1a1a/e0e0e0?text=Almuerzo",
+                        fecha: new Date(),
+                        codigo: "PL-" + Math.random().toString(36).substr(2, 8).toUpperCase()
+                    },
+                    {
+                        nombre: "Salmón a la parrilla",
+                        descripcion: "Filete de salmón fresco a la parrilla con un toque de limón y hierbas, acompañado de vegetales al vapor.",
+                        precio: 18.75,
+                        imagen: "https://placehold.co/400x300/f8f9fa/212529?text=Cena",
+                        fecha: new Date(),
+                        codigo: "PL-" + Math.random().toString(36).substr(2, 8).toUpperCase()
+                    },
+                    {
+                        nombre: "Ensalada César",
+                        descripcion: "Lechuga romana fresca, crutones, queso parmesano y pollo a la parrilla, todo bañado en aderezo César.",
+                        precio: 9.50,
+                        imagen: "https://placehold.co/400x300/a2b29f/1e1e1e?text=Ensalada",
+                        fecha: new Date(),
+                        codigo: "PL-" + Math.random().toString(36).substr(2, 8).toUpperCase()
+                    }
+                ];
+                
+                const batch = db.batch();
+                productosIniciales.forEach(producto => {
+                    const docRef = collectionRef.doc();
+                    batch.set(docRef, producto);
+                });
+                await batch.commit();
+                console.log("Productos iniciales agregados.");
+            }
+        }
+
+        // Abrir modal de agregar producto
+        btnAdd.addEventListener('click', () => {
+            addModalTitle.textContent = 'Nuevo Plato';
+            submitButton.textContent = 'Publicar';
+            formAdd.reset();
+            imagenPreview.style.display = 'none';
+            fileName.textContent = '';
+            selectedFile = null;
+            currentProductIdToEdit = null;
+            showModal(addModal);
+        });
+        
+        // Abrir modal del carrito
+        btnCart.addEventListener('click', () => {
+            renderCartItems();
+            showModal(cartModal);
+        });
+
+        // Enviar formulario (maneja tanto agregar como editar)
+        formAdd.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const isEditing = currentProductIdToEdit !== null;
+            
+            if (!isEditing && !selectedFile) {
+                errorFile.textContent = '¡Debes seleccionar una imagen!';
+                errorFile.style.display = 'block';
+                return;
+            }
+
+            submitButton.disabled = true;
+            submitButton.textContent = isEditing ? 'Guardando...' : 'Publicando...';
+
+            let imageUrl = '';
+            try {
+                if (selectedFile) {
+                    const formData = new FormData();
+                    formData.append('image', selectedFile);
+                    formData.append('key', '4d802a57e054429108a366c66d9ff65b'); // Clave de imgbb
+
+                    const response = await fetch('https://api.imgbb.com/1/upload', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const result = await response.json();
+
+                    if (!result.success) {
+                        throw new Error(result.error.message || 'Error al subir imagen');
+                    }
+                    imageUrl = result.data.url;
+                }
+
+                const data = {
+                    nombre: document.getElementById('nombre').value,
+                    descripcion: document.getElementById('descripcion').value,
+                    precio: parseFloat(document.getElementById('precio').value),
+                };
+                
+                if (imageUrl) {
+                    data.imagen = imageUrl;
+                }
+
+                if (isEditing) {
+                    await db.collection('productos').doc(currentProductIdToEdit).update(data);
+                } else {
+                    data.fecha = new Date();
+                    data.codigo = 'PL-' + Math.random().toString(36).substr(2, 8).toUpperCase();
+                    await db.collection('productos').add(data);
+                }
+
+                formAdd.reset();
+                imagenPreview.style.display = 'none';
+                fileName.textContent = '';
+                selectedFile = null;
+                hideModal(addModal);
+                
+            } catch (error) {
+                console.error("Error:", error);
+                errorFile.textContent = 'Error: ' + (error.message || 'Intenta de nuevo');
+                errorFile.style.display = 'block';
+            } finally {
+                submitButton.disabled = false;
+                submitButton.textContent = isEditing ? 'Guardar Cambios' : 'Publicar';
+            }
+        });
+
+        // Función para renderizar una tarjeta de producto
+        function createProductCard(doc) {
+            const producto = doc.data();
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.innerHTML = `
+                <img src="${producto.imagen}" alt="${producto.nombre}" loading="lazy" onerror="this.src='https://placehold.co/250x180/1a1a1a/e0e0e0?text=Imagen+no+disponible';">
+                <div class="card-info">
+                    <h3>${producto.nombre}</h3>
+                    <p class="price">$${producto.precio.toFixed(2)} USD</p>
+                    <button class="btnVer" data-id="${doc.id}">👀 Ver Detalles</button>
+                    <button class="btnCarrito" data-id="${doc.id}">➕ Agregar a la Orden</button>
                 </div>
             `;
-            // Vuelve a inicializar los íconos de lucide para el nuevo elemento
-            lucide.createIcons();
-            return newCard;
-        }
-
-        // Función para copiar texto al portapapeles
-        function copyToClipboard(text) {
-            const textarea = document.createElement('textarea');
-            textarea.value = text;
-            document.body.appendChild(textarea);
-            textarea.select();
-            try {
-                const successful = document.execCommand('copy');
-                if (successful) {
-                    showToast('Enlace copiado al portapapeles');
-                } else {
-                    console.error('La copia al portapapeles falló');
-                }
-            } catch (err) {
-                console.error('Error al copiar el texto: ', err);
-            }
-            document.body.removeChild(textarea);
-        }
-
-        // --- Funciones de Firestore ---
-
-        // Función para cargar los productos del usuario desde Firestore
-        function loadProducts() {
-            if (!userId) return;
-
-            const productsCollection = collection(db, `artifacts/${appId}/users/${userId}/products`);
+            productGrid.appendChild(card);
             
-            onSnapshot(productsCollection, (snapshot) => {
-                productGrid.innerHTML = ''; // Limpiar el grid antes de renderizar
-                if (snapshot.empty) {
-                    noProductsMessage.classList.remove('hidden');
-                } else {
-                    noProductsMessage.classList.add('hidden');
-                    snapshot.forEach(doc => {
-                        const productData = doc.data();
-                        const product = {
-                            id: doc.id,
-                            ...productData
-                        };
-                        const productCard = createProductCard(product);
-                        productGrid.appendChild(productCard);
+            card.querySelector('.btnVer').addEventListener('click', () => {
+                mostrarDetalles(doc.id);
+            });
+            card.querySelector('.btnCarrito').addEventListener('click', () => {
+                const item = allProducts.find(p => p.id === doc.id);
+                if (item) {
+                    addToCart(item.data(), item.id);
+                }
+            });
+        }
+
+        // Escuchar cambios en la base de datos y actualizar el catálogo
+        db.collection('productos').orderBy('fecha', 'desc').onSnapshot((snapshot) => {
+            allProducts = snapshot.docs; // Guardar todos los productos
+            filterProducts();
+            productCount.textContent = `(${allProducts.length} platos)`;
+        });
+
+        // Función para filtrar los productos según el término de búsqueda
+        function filterProducts() {
+            const searchTerm = searchInput.value.toLowerCase();
+            productGrid.innerHTML = '';
+            
+            const filteredProducts = allProducts.filter(doc => {
+                const producto = doc.data();
+                return producto.nombre.toLowerCase().includes(searchTerm) || producto.descripcion.toLowerCase().includes(searchTerm);
+            });
+            
+            filteredProducts.forEach((doc) => {
+                createProductCard(doc);
+            });
+        }
+        
+        // Event listener para el campo de búsqueda
+        searchInput.addEventListener('input', filterProducts);
+
+        // Función para mostrar el modal de detalles de un plato
+        async function mostrarDetalles(id) {
+            try {
+                const docRef = db.collection('productos').doc(id);
+                const doc = await docRef.get();
+                if (doc.exists) {
+                    const producto = doc.data();
+                    
+                    currentProductIdToEdit = id; // Guardar el ID para la edición
+                    currentProductIdToDelete = id; // Guardar el ID para la eliminación
+                    currentItemToAdd = { ...producto, id: doc.id }; // Guardar el item para el carrito
+                    
+                    document.getElementById('detailNombre').textContent = producto.nombre;
+                    document.getElementById('detailImagen').src = producto.imagen;
+                    document.getElementById('detailImagen').alt = producto.nombre;
+                    document.getElementById('detailDescripcion').textContent = producto.descripcion;
+                    document.getElementById('detailPrecio').textContent = producto.precio.toFixed(2);
+                    
+                    const productUrl = `${window.location.protocol}//${window.location.host}${window.location.pathname}?id=${id}`;
+                    
+                    const qr = qrcode(0, 'L');
+                    qr.addData(productUrl);
+                    qr.make();
+                    document.getElementById('qrCode').innerHTML = qr.createImgTag(4);
+                    
+                    const barcodeData = producto.codigo || id;
+                    JsBarcode('#barcode', barcodeData, {
+                        format: 'CODE128',
+                        lineColor: '#000',
+                        width: 2,
+                        height: 60,
+                        displayValue: true
                     });
-                }
-                productGrid.classList.remove('hidden');
-            }, (error) => {
-                console.error("Error al escuchar los productos: ", error);
-                productGrid.innerHTML = '<p class="text-center text-red-500">Error al cargar los productos.</p>';
-                productGrid.classList.remove('hidden');
-            });
-        }
-        
-        // Función para agregar un producto a la base de datos
-        async function addProductToDb(product) {
-            if (!userId) {
-                showToast("Error: No se pudo autenticar al usuario.");
-                return;
-            }
-            try {
-                const productsCollection = collection(db, `artifacts/${appId}/users/${userId}/products`);
-                await addDoc(productsCollection, product);
-                showToast("Prenda publicada con éxito.");
-            } catch (error) {
-                console.error("Error al agregar el producto: ", error);
-                showToast("Error al publicar la prenda.");
-            }
-        }
 
-        // Función para eliminar un producto de la base de datos
-        async function deleteProductFromDb(productId) {
-            if (!userId) {
-                showToast("Error: No se pudo autenticar al usuario.");
-                return;
-            }
-            try {
-                const productRef = doc(db, `artifacts/${appId}/users/${userId}/products`, productId);
-                await deleteDoc(productRef);
-                showToast("Prenda eliminada.");
-            } catch (error) {
-                console.error("Error al eliminar el producto: ", error);
-                showToast("Error al eliminar la prenda.");
-            }
-        }
-        
-        // --- Lógica de autenticación y carga inicial ---
-        function initializeApp() {
-            onAuthStateChanged(auth, async (user) => {
-                if (user) {
-                    userId = user.uid;
-                    
-                    const urlParams = new URLSearchParams(window.location.search);
-                    const userInUrl = urlParams.get('user');
-                    const storedUserName = localStorage.getItem('userName');
-                    
-                    if (userInUrl) {
-                         userName = userInUrl;
-                         localStorage.setItem('userName', userName);
-                         userGreeting.textContent = `Bienvenido, ${userName}!`;
-                         
-                         const productId = urlParams.get('item');
-                         if (productId) {
-                             try {
-                                 const productRef = doc(db, `artifacts/${appId}/users/${userId}/products`, productId);
-                                 const productSnap = await getDoc(productRef);
-                                 if (productSnap.exists()) {
-                                     const product = { id: productSnap.id, ...productSnap.data() };
-                                     setTimeout(() => openQrModal(product), 500);
-                                 } else {
-                                     showToast("Producto no encontrado.");
-                                 }
-                             } catch (error) {
-                                 console.error("Error al obtener el producto:", error);
-                                 showToast("Error al cargar el producto.");
-                             }
-                         }
-                         loadProducts();
-                    } else if (storedUserName) {
-                        userName = storedUserName;
-                        userGreeting.textContent = `Bienvenido, ${userName}!`;
-                        loadProducts();
-                    } else {
-                        // El usuario no tiene un nombre guardado, lo pedimos
-                        openUsernameModal();
-                    }
+                    showModal(detailModal);
+
                 } else {
-                    try {
-                        if (initialAuthToken) {
-                            await signInWithCustomToken(auth, initialAuthToken);
-                        } else {
-                            await signInAnonymously(auth);
-                        }
-                    } catch (error) {
-                        console.error("Error de autenticación:", error);
-                        productGrid.innerHTML = '<p class="text-center text-red-500">Error al iniciar sesión. Por favor, inténtalo de nuevo.</p>';
-                    }
+                    console.error("No se encontró el documento con ID:", id);
                 }
+            } catch (error) {
+                console.error("Error al obtener los detalles:", error);
+            }
+        }
+
+        // Funciones del Carrito de Compras
+        function addToCart(item) {
+            const existingItemIndex = cartItems.findIndex(i => i.id === item.id);
+            if (existingItemIndex > -1) {
+                cartItems[existingItemIndex].quantity += 1;
+            } else {
+                cartItems.push({ ...item, quantity: 1 });
+            }
+            updateCartCount();
+            renderCartItems();
+        }
+
+        function removeFromCart(itemId) {
+            cartItems = cartItems.filter(item => item.id !== itemId);
+            updateCartCount();
+            renderCartItems();
+        }
+
+        function updateCartCount() {
+            const totalItems = cartItems.reduce((acc, item) => acc + item.quantity, 0);
+            document.getElementById('cartCount').textContent = totalItems;
+        }
+
+        function renderCartItems() {
+            cartItemsList.innerHTML = '';
+            let total = 0;
+            if (cartItems.length === 0) {
+                cartItemsList.innerHTML = '<li style="text-align: center; color: #aaa;">El carrito está vacío.</li>';
+            } else {
+                cartItems.forEach(item => {
+                    total += item.precio * item.quantity;
+                    const li = document.createElement('li');
+                    li.className = 'cart-item';
+                    li.innerHTML = `
+                        <div class="cart-item-info">
+                            <img src="${item.imagen}" alt="${item.nombre}" onerror="this.src='https://placehold.co/60x60/1a1a1a/e0e0e0?text=Comida';">
+                            <div>
+                                <h4>${item.nombre}</h4>
+                                <p>$${item.precio.toFixed(2)} x ${item.quantity}</p>
+                            </div>
+                        </div>
+                        <div class="cart-item-actions">
+                            <p class="price">$${(item.precio * item.quantity).toFixed(2)}</p>
+                            <button onclick="removeFromCart('${item.id}')">✖️</button>
+                        </div>
+                    `;
+                    cartItemsList.appendChild(li);
+                });
+            }
+            cartTotalSpan.textContent = total.toFixed(2);
+        }
+
+        btnBuy.addEventListener('click', () => {
+            if (cartItems.length === 0) return;
+            // Simulación de compra
+            hideModal(cartModal);
+            showModal(purchaseConfirmModal);
+            cartItems = [];
+            updateCartCount();
+        });
+        
+        // Evento para agregar al carrito desde el modal de detalles
+        btnAddCart.addEventListener('click', () => {
+            if (currentItemToAdd) {
+                addToCart(currentItemToAdd);
+                hideModal(detailModal);
+            }
+        });
+
+        // Funciones para mostrar y ocultar modales con transiciones
+        function showModal(modalElement) {
+            modalElement.classList.add('show');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function hideModal(modalElement) {
+            modalElement.classList.remove('show');
+            modalElement.addEventListener('transitionend', function handler() {
+                document.body.style.overflow = 'auto';
+                modalElement.removeEventListener('transitionend', handler);
             });
         }
         
-        // --- Event Listeners ---
+        // Función para cerrar todos los modales
+        function cerrarModales() {
+            hideModal(addModal);
+            hideModal(detailModal);
+            hideModal(cartModal);
+            hideModal(purchaseConfirmModal);
+            hideModal(deleteConfirmModal);
+            currentProductIdToEdit = null;
+            currentProductIdToDelete = null;
+            currentItemToAdd = null;
+            if (window.location.search) {
+                window.history.pushState({}, document.title, window.location.pathname);
+            }
+        }
 
-        productGrid.addEventListener('click', (e) => {
-            const qrBtn = e.target.closest('.btn-qr');
-            const deleteBtn = e.target.closest('.delete-btn');
-            
-            if (qrBtn) {
-                const productId = qrBtn.dataset.productId;
-                const itemElement = document.getElementById(`item-${productId}`);
+        // Event listener para el botón de editar
+        btnEdit.addEventListener('click', async () => {
+            const docRef = db.collection('productos').doc(currentProductIdToEdit);
+            const doc = await docRef.get();
+            if (doc.exists) {
+                const producto = doc.data();
+                document.getElementById('nombre').value = producto.nombre;
+                document.getElementById('descripcion').value = producto.descripcion;
+                document.getElementById('precio').value = producto.precio;
                 
-                const productData = {
-                    id: productId,
-                    name: itemElement.querySelector('h2').textContent,
-                    description: itemElement.querySelector('p').textContent,
-                    price: itemElement.querySelector('.text-2xl').textContent.replace('$', ''),
-                    sizes: itemElement.querySelector('.text-sm').textContent.replace('Tallas: ', ''),
-                    image: itemElement.querySelector('img').src,
-                };
-                openQrModal(productData);
-            }
-            
-            if (deleteBtn) {
-                const productId = deleteBtn.dataset.productId;
-                openDeleteConfirmModal(productId);
+                imagenPreview.src = producto.imagen;
+                imagenPreview.style.display = 'block';
+                fileName.textContent = 'Se usará la imagen actual a menos que subas una nueva.';
+                
+                addModalTitle.textContent = 'Editar Plato';
+                submitButton.textContent = 'Guardar Cambios';
+                
+                hideModal(detailModal);
+                showModal(addModal);
             }
         });
 
-        qrModalCloseBtn.addEventListener('click', closeQrModal);
-        qrModal.addEventListener('click', (e) => {
-            if (e.target === qrModal) closeQrModal();
+        // Event listener para el botón de eliminar, abre el modal de confirmación
+        btnDelete.addEventListener('click', () => {
+            hideModal(detailModal);
+            showModal(deleteConfirmModal);
         });
 
-        addProductBtn.addEventListener('click', openAddProductModal);
-
-        addProductModalCloseBtn.addEventListener('click', closeAddProductModal);
-        addProductModal.addEventListener('click', (e) => {
-            if (e.target === addProductModal) closeAddProductModal();
-        });
-
-        addProductForm.addEventListener('submit', (e) => {
-            e.preventDefault();
-
-            const product = {
-                name: document.getElementById('product-name').value,
-                description: document.getElementById('product-desc').value,
-                price: parseFloat(document.getElementById('product-price').value).toFixed(2),
-                sizes: document.getElementById('product-sizes').value,
-                image: document.getElementById('product-image').value
-            };
-
-            addProductToDb(product);
-            closeAddProductModal();
-        });
-        
-        usernameForm.addEventListener('submit', (e) => {
-            e.preventDefault();
-            const inputName = document.getElementById('username-input').value;
-            if (inputName && inputName.trim() !== '') {
-                userName = inputName;
-                localStorage.setItem('userName', userName);
-                userGreeting.textContent = `Bienvenido, ${userName}!`;
-                closeUsernameModal();
-                loadProducts();
-            } else {
-                showToast('Por favor, introduce un nombre válido.');
-            }
-        });
-        
-        deleteConfirmBtn.addEventListener('click', () => {
-            if (productToDeleteId) {
-                deleteProductFromDb(productToDeleteId);
-                closeDeleteConfirmModal();
+        // Event listener para el botón de confirmar eliminación
+        btnConfirmDelete.addEventListener('click', async () => {
+            if (currentProductIdToDelete) {
+                try {
+                    await db.collection('productos').doc(currentProductIdToDelete).delete();
+                    console.log("Plato eliminado con éxito.");
+                } catch (error) {
+                    console.error("Error al eliminar el plato:", error);
+                } finally {
+                    cerrarModales();
+                }
             }
         });
 
-        deleteCancelBtn.addEventListener('click', closeDeleteConfirmModal);
-        deleteConfirmCloseBtn.addEventListener('click', closeDeleteConfirmModal);
-        deleteConfirmModal.addEventListener('click', (e) => {
-            if (e.target === deleteConfirmModal) closeDeleteConfirmModal();
+        // Event listener para el botón de cancelar eliminación
+        btnCancelDelete.addEventListener('click', () => {
+            hideModal(deleteConfirmModal);
+            showModal(detailModal);
         });
 
-        initializeApp();
+        // Detectar si hay un ID de producto en la URL al cargar la página
+        window.onload = function() {
+            agregarProductosIniciales();
+            const urlParams = new URLSearchParams(window.location.search);
+            const productId = urlParams.get('id');
+            if (productId) {
+                mostrarDetalles(productId);
+            }
+        };
+
+        // Event listeners para cerrar modales
+        document.addEventListener('click', (e) => {
+            if (e.target.classList.contains('modal')) {
+                cerrarModales();
+            }
+        });
+
+        closeDetailBtn.addEventListener('click', cerrarModales);
+        closeCartBtn.addEventListener('click', cerrarModales);
+        closePurchaseConfirmBtn.addEventListener('click', cerrarModales);
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                cerrarModales();
+            }
+        });
     </script>
-<!-- Static App Form Collection Script -->
-<script src="https://static.app/js/static-forms.js" type="text/javascript"></script>
-
-<script src="https://static.app/js/static.js" type="text/javascript"></script>
 </body>
 </html>
